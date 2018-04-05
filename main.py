@@ -2,8 +2,8 @@ import numpy as np
 import csv
 import random
 
-def data_handle():
-    file = open('train.csv', 'r') #PassengerId,Survived,Pclass,Name,Sex,Age,SibSp,Parch,Ticket,Fare,Cabin,Embarked
+def data_handle(file_name):
+    file = open(file_name, 'r') #PassengerId,Survived,Pclass,Name,Sex,Age,SibSp,Parch,Ticket,Fare,Cabin,Embarked
     dataset = []
     embarked_buf = {'S': 0, 'C': 1 ,'Q': 2}
     for row in csv.DictReader(file):
@@ -16,7 +16,16 @@ def data_handle():
         embarked = -1
         if row['Embarked']:
             embarked = embarked_buf[row['Embarked']]
-        dataset.append([(float(row['Pclass']), sex, age, int(row['SibSp']), int(row['Parch']), float(row['Fare']), embarked ), int(row['Survived'])])
+        fare = -999
+        if row['Fare']:
+            fare = float(row['Fare'])
+        survived = 1
+        if file_name == 'train.csv':
+            if int(row['Survived']) == 0:
+                survived = -1
+            dataset.append([(float(row['Pclass']), sex, age, int(row['SibSp']), int(row['Parch']), fare, embarked ), survived])
+        else:
+            dataset.append([(float(row['Pclass']), sex, age, int(row['SibSp']), int(row['Parch']), fare, embarked ), int(row['PassengerId'])])
         #print(row['PassengerId']," | ", dataset[len(dataset) - 1])
     file.close()
     return dataset
@@ -33,12 +42,10 @@ def check_error(w, dataset):
     print("error=%s/%s" % (error, len(dataset)))
     return result
 
-#PLA演算法實作
-
 def pla(dataset):
     w = np.zeros(7)
     w_buf = w
-    max_t = 100
+    max_t = 5000
     time = 0
     while check_error(w, dataset) is not None:
         x, s = check_error(w, dataset)
@@ -52,34 +59,28 @@ def pla(dataset):
             break
     return w
 
-def pocket_pla(datas, limit):  
-    ###############
-    def _calc_false(vec):
-        res = 0
-        for data in datas:
-            t = np.dot(vec, data[0])
-            if np.sign(data[1]) != np.sign(t):
-                res += 1
-        return res
-    ###############
-    w = np.random.rand(7)
-    least_false = _calc_false(w)
-    res = w
+def test(w, data_test):
+    result = []
+    for x, s in data_test:
+        x = np.array(x)
+        if int(np.sign(w.T.dot(x))) == -1:
+            result.append([s , 0])
+        else:
+            result.append([s , 1])
+    return result
 
-    for i in range(limit):
-        data = random.choice(datas)
-        t = np.dot(w, data[0])
-        if np.sign(data[1]) != np.sign(t):
-            t = w + data[1] * data[0]
-            t_false = _calc_false(t)
+def writeToCsv(result):
+    f = open('result.csv', 'w', newline='')
+    w = csv.writer(f)
+    w.writerows([['PassengerId','Survived']])
+    w.writerows(result)
+    f.close()
+    print("Write complete!!")
+    return
 
-            w = t
-
-            if t_false <= least_false:
-                least_false = t_false
-                res = t
-    return res, least_false
-#執行
-dataset = data_handle()
-w = pocket_pla(dataset, 100)
-print(w)
+dataset = data_handle('train.csv')
+w = pla(dataset)
+print("result: " , w)
+data_test = data_handle('test.csv')
+result = test(w, data_test)
+writeToCsv(result)
